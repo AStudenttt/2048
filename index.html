@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2048 连锁爽感版 - 慢动作连击</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #faf8ef;
+            color: #776e65;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            padding: 15px;
+            overflow-x: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .title-scores {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 42px;
+            font-weight: bold;
+            color: #776e65;
+            line-height: 1;
+        }
+
+        .score-box {
+            background: #bbada0;
+            padding: 6px 14px;
+            border-radius: 6px;
+            text-align: center;
+            color: white;
+            min-width: 70px;
+        }
+
+        .score-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #eee4da;
+            font-weight: bold;
+        }
+
+        .score-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .controls-top {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            background: #8f7a66;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 14px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn:hover { background: #9f8b77; }
+        .btn:active { transform: scale(0.96); }
+
+        /* 爽感实验室预设面板 */
+        .lab-panel {
+            width: 100%;
+            background: #bbada0;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 12px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .lab-title {
+            font-size: 13px;
+            color: #f9f6f2;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .lab-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .lab-btn {
+            flex: 1;
+            background: #edc53f;
+            color: #776e65;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 6px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 3px 0 #b3932b;
+            transition: all 0.1s;
+            text-align: center;
+        }
+
+        .lab-btn:hover { background: #f2d06b; }
+        .lab-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #b3932b; }
+
+        /* 引导横幅 */
+        .guide-banner {
+            width: 100%;
+            background: #f1ebd9;
+            border-left: 4px solid #edc53f;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-bottom: 15px;
+            color: #776e65;
+        }
+
+        /* 棋盘外框 */
+        .board-container {
+            position: relative;
+            background: #bbada0;
+            border-radius: 10px;
+            padding: 12px;
+            width: 100%;
+            aspect-ratio: 1;
+            max-width: 440px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            touch-action: none; /* 在棋盘上滑动时不滚动页面 */
+        }
+
+        /* 震动与特写特效类 */
+        .board-container.shake-mild {
+            animation: boardShakeMild 0.3s ease;
+        }
+        .board-container.zoom-punch {
+            animation: boardZoomPunch 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes boardShakeMild {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            20% { transform: translate(-3px, 2px) scale(1.01); }
+            60% { transform: translate(3px, -2px) scale(1.02); }
+            100% { transform: translate(0, 0) scale(1); }
+        }
+
+        @keyframes boardZoomPunch {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.03); filter: brightness(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .grid-container {
+            position: absolute;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 12px;
+            width: calc(100% - 24px);
+            height: calc(100% - 24px);
+        }
+
+        .grid-cell {
+            background: rgba(238, 228, 218, 0.35);
+            border-radius: 6px;
+        }
+
+        .tile-container {
+            position: absolute;
+            width: calc(100% - 24px);
+            height: calc(100% - 24px);
+            pointer-events: none;
+        }
+
+        .tile {
+            position: absolute;
+            width: calc(25% - 9px);
+            height: calc(25% - 9px);
+            background: #eee4da;
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 32px;
+            color: #776e65;
+            transition: transform 0.15s ease-in-out;
+            will-change: transform;
+        }
+
+        /* 方块数字颜色 */
+        .tile-2 { background: #eee4da; color: #776e65; }
+        .tile-4 { background: #ede0c8; color: #776e65; }
+        .tile-8 { background: #f2b179; color: #f9f6f2; }
+        .tile-16 { background: #f59563; color: #f9f6f2; }
+        .tile-32 { background: #f67c5f; color: #f9f6f2; }
+        .tile-64 { background: #f65e3b; color: #f9f6f2; }
+        .tile-128 { background: #edcf72; color: #f9f6f2; font-size: 28px; }
+        .tile-256 { background: #edcc61; color: #f9f6f2; font-size: 28px; }
+        .tile-512 { background: #edc850; color: #f9f6f2; font-size: 28px; }
+        .tile-1024 { background: #edc53f; color: #f9f6f2; font-size: 24px; }
+        .tile-2048 { background: #edc22e; color: #f9f6f2; font-size: 24px; box-shadow: 0 0 20px 4px rgba(237, 194, 46, 0.6); }
+
+        .tile-new { animation: appear 0.2s ease-out; }
+        @keyframes appear {
+            0% { opacity: 0; scale: 0; }
+            100% { opacity: 1; scale: 1; }
+        }
+
+        .tile-merged { animation: pop 0.2s ease-out; }
+        @keyframes pop {
+            0% { scale: 1; }
+            50% { scale: 1.15; filter: brightness(1.1); }
+            100% { scale: 1; }
+        }
+
+        /* 浮动加分与连锁徽章气泡 */
+        .score-float {
+            position: absolute;
+            font-weight: bold;
+            font-size: 20px;
+            color: #f65e3b;
+            animation: floatUp 0.7s ease-out forwards;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .chain-badge {
+            position: absolute;
+            background: rgba(246, 94, 59, 0.9);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: bold;
+            animation: badgePop 0.8s ease-out forwards;
+            pointer-events: none;
+            z-index: 101;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-40px); }
+        }
+
+        @keyframes badgePop {
+            0% { opacity: 0; transform: scale(0.5); }
+            30% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0; transform: translateY(-25px); }
+        }
+
+        .game-message {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(238, 228, 218, 0.85);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 10px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .game-message.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .game-message p {
+            font-size: 32px;
+            font-weight: bold;
+            color: #776e65;
+            margin-bottom: 15px;
+        }
+
+        .btn, .score-title { white-space: nowrap; }
+
+        @media (max-width: 420px) {
+            body { padding: 12px; }
+            h1 { font-size: 30px; }
+            .title-scores { gap: 6px; }
+            .score-box { padding: 5px 8px; min-width: 56px; }
+            .score-value { font-size: 16px; }
+            .controls-top { gap: 6px; }
+            .btn { padding: 8px 10px; font-size: 13px; }
+            .tile { font-size: 26px; }
+            .tile-128, .tile-256, .tile-512 { font-size: 22px; }
+            .tile-1024, .tile-2048 { font-size: 18px; }
+        }
+
+        .instructions {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #8f7a66;
+            text-align: center;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <div class="title-scores">
+                <h1>2048</h1>
+                <div style="display:flex; gap:6px;">
+                    <div class="score-box">
+                        <div class="score-title">得分</div>
+                        <div id="score" class="score-value">0</div>
+                    </div>
+                    <div class="score-box">
+                        <div class="score-title">历史最高</div>
+                        <div id="best-score" class="score-value">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="controls-top">
+                <button class="btn" id="undo-btn">↶ 悔棋</button>
+                <button class="btn" id="restart-btn">重新开始</button>
+            </div>
+        </header>
+
+        <!-- 爽感实验室 -->
+        <div class="lab-panel">
+            <div class="lab-title">⚡ 爽感实验室（慢动作连锁特写）</div>
+            <div class="lab-buttons">
+                <button class="lab-btn" id="preset-chain3">🔥 阶梯三连跳 (256-256-512-1024)</button>
+            </div>
+        </div>
+
+        <div class="guide-banner" id="guide-banner">
+            <span id="guide-text">💡 提示：点击上方按钮加载“阶梯三连跳”，然后按键盘向右键 (→) 或往右滑动体验慢动作连锁！</span>
+        </div>
+
+        <div class="board-container" id="board-container">
+            <div class="grid-container">
+                <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+                <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+                <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+                <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+            </div>
+            <div class="tile-container" id="tile-container"></div>
+
+            <div class="game-message" id="game-message">
+                <p id="message-text">游戏结束！</p>
+                <button class="btn" id="retry-btn">再试一次</button>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <strong>操作指南</strong>：使用方向键 (← ↑ ↓ →) 或 W A S D 移动。<br>
+            触发连锁时会自动慢动作回放，并伴有特写运镜与震动！
+        </div>
+    </div>
+
+    <script>
+        const GAP = 12; // 与 .grid-container 的 gap 保持一致
+
+        function readBest() {
+            try { return Number(localStorage.getItem('best_score_chain')) || 0; } catch (e) { return 0; }
+        }
+        function writeBest(v) {
+            try { localStorage.setItem('best_score_chain', v); } catch (e) {}
+        }
+
+        class Game2048 {
+            constructor() {
+                this.size = 4;
+                this.score = 0;
+                this.bestScore = readBest();
+                this.isAnimating = false;
+                this.history = [];
+                this.nextId = 1;
+                this.tiles = new Map(); // id -> tile
+                this.grid = Array(this.size).fill(0).map(() => Array(this.size).fill(null));
+
+                this.initDOM();
+                this.initEvents();
+                this.restart();
+            }
+
+            initDOM() {
+                this.scoreEl = document.getElementById('score');
+                this.bestScoreEl = document.getElementById('best-score');
+                this.tileContainer = document.getElementById('tile-container');
+                this.boardContainer = document.getElementById('board-container');
+                this.messageEl = document.getElementById('game-message');
+                this.messageText = document.getElementById('message-text');
+                this.bestScoreEl.textContent = this.bestScore;
+            }
+
+            initEvents() {
+                document.getElementById('restart-btn').addEventListener('click', () => { if (!this.isAnimating) this.restart(); });
+                document.getElementById('retry-btn').addEventListener('click', () => { if (!this.isAnimating) this.restart(); });
+                document.getElementById('undo-btn').addEventListener('click', () => this.undo());
+
+                document.getElementById('preset-chain3').addEventListener('click', () => {
+                    if (this.isAnimating) return;
+                    this.loadPreset([
+                        [0, 0, 0, 0],
+                        [0, 0, 0, 0],
+                        [0, 0, 0, 0],
+                        [256, 256, 512, 1024]
+                    ], "🔥 已加载阶梯三连跳！请按【向右键 →】体验慢动作连击！");
+                });
+
+                window.addEventListener('keydown', e => {
+                    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS', 'KeyA', 'KeyD'].includes(e.code)) {
+                        e.preventDefault();
+                        if (this.isAnimating) return;
+                        let vec = { x: 0, y: 0 };
+                        if (e.code === 'ArrowUp' || e.code === 'KeyW') vec = { x: 0, y: -1 };
+                        else if (e.code === 'ArrowDown' || e.code === 'KeyS') vec = { x: 0, y: 1 };
+                        else if (e.code === 'ArrowLeft' || e.code === 'KeyA') vec = { x: -1, y: 0 };
+                        else if (e.code === 'ArrowRight' || e.code === 'KeyD') vec = { x: 1, y: 0 };
+                        this.move(vec);
+                    }
+                });
+
+                let startX = 0, startY = 0;
+                window.addEventListener('touchstart', e => {
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                }, { passive: true });
+
+                window.addEventListener('touchend', e => {
+                    if (this.isAnimating) return;
+                    let dx = e.changedTouches[0].clientX - startX;
+                    let dy = e.changedTouches[0].clientY - startY;
+                    if (Math.max(Math.abs(dx), Math.abs(dy)) > 30) {
+                        let vec = Math.abs(dx) > Math.abs(dy) ?
+                            (dx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 }) :
+                            (dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 });
+                        this.move(vec);
+                    }
+                }, { passive: true });
+            }
+
+            restart() {
+                this.tiles.clear();
+                this.nextId = 1;
+                this.grid = Array(this.size).fill(0).map(() => Array(this.size).fill(null));
+                this.score = 0;
+                this.history = [];
+                this.messageEl.classList.remove('active');
+                document.getElementById('guide-text').textContent = "💡 提示：使用方向键移动，连锁合成时会自动放慢并产生运镜特写！";
+
+                this.addRandomTile();
+                this.addRandomTile();
+                this.updateView();
+                this.updateScore();
+            }
+
+            loadPreset(matrix, guideText) {
+                this.tiles.clear();
+                this.nextId = 1;
+                this.grid = Array(this.size).fill(0).map(() => Array(this.size).fill(null));
+                this.history = [];
+                this.messageEl.classList.remove('active');
+
+                for (let r = 0; r < this.size; r++) {
+                    for (let c = 0; c < this.size; c++) {
+                        if (matrix[r][c] > 0) {
+                            let tile = { id: this.nextId++, x: c, y: r, value: matrix[r][c], merged: false, isNew: false };
+                            this.tiles.set(tile.id, tile);
+                            this.grid[r][c] = tile;
+                        }
+                    }
+                }
+                document.getElementById('guide-text').textContent = guideText;
+                this.updateView();
+            }
+
+            saveState() {
+                const gridState = this.grid.map(row => row.map(t => t ? { value: t.value } : null));
+                this.history.push({ grid: gridState, score: this.score });
+                if (this.history.length > 20) this.history.shift();
+            }
+
+            undo() {
+                if (this.isAnimating || this.history.length === 0) return;
+                const last = this.history.pop();
+                this.score = last.score;
+                this.tiles.clear();
+                this.nextId = 1;
+                this.grid = Array(this.size).fill(0).map(() => Array(this.size).fill(null));
+                this.messageEl.classList.remove('active');
+
+                for (let r = 0; r < this.size; r++) {
+                    for (let c = 0; c < this.size; c++) {
+                        let item = last.grid[r][c];
+                        if (item) {
+                            let tile = { id: this.nextId++, x: c, y: r, value: item.value, merged: false, isNew: false };
+                            this.tiles.set(tile.id, tile);
+                            this.grid[r][c] = tile;
+                        }
+                    }
+                }
+                this.updateView();
+                this.updateScore();
+            }
+
+            addRandomTile() {
+                let empties = [];
+                for (let r = 0; r < this.size; r++) {
+                    for (let c = 0; c < this.size; c++) {
+                        if (!this.grid[r][c]) empties.push({ r, c });
+                    }
+                }
+                if (empties.length > 0) {
+                    let { r, c } = empties[Math.floor(Math.random() * empties.length)];
+                    let tile = { id: this.nextId++, x: c, y: r, value: Math.random() < 0.9 ? 2 : 4, merged: false, isNew: true };
+                    this.tiles.set(tile.id, tile);
+                    this.grid[r][c] = tile;
+                }
+            }
+
+            singleStep(vec) {
+                let moved = false;
+                let mergedThisWave = [];
+                let scoreGained = 0;
+
+                this.tiles.forEach(t => t.merged = false);
+
+                let xs = Array(this.size).fill(0).map((_, i) => i);
+                let ys = Array(this.size).fill(0).map((_, i) => i);
+                if (vec.x === 1) xs.reverse();
+                if (vec.y === 1) ys.reverse();
+
+                xs.forEach(c => {
+                    ys.forEach(r => {
+                        let tile = this.grid[r][c];
+                        if (!tile) return;
+
+                        let nx = c, ny = r;
+                        let lastValid = { x: c, y: r };
+
+                        while (true) {
+                            let tx = nx + vec.x;
+                            let ty = ny + vec.y;
+                            if (tx < 0 || tx >= this.size || ty < 0 || ty >= this.size) break;
+                            let nextTile = this.grid[ty][tx];
+                            if (!nextTile) {
+                                lastValid = { x: tx, y: ty };
+                                nx = tx; ny = ty;
+                            } else if (nextTile.value === tile.value && !nextTile.merged) {
+                                lastValid = { x: tx, y: ty };
+                                break;
+                            } else {
+                                break;
+                            }
+                        }
+
+                        if (lastValid.x !== c || lastValid.y !== r) {
+                            let target = this.grid[lastValid.y][lastValid.x];
+                            if (target && target.value === tile.value && !target.merged) {
+                                // 合并
+                                target.value *= 2;
+                                target.merged = true;
+                                this.grid[r][c] = null;
+                                this.tiles.delete(tile.id);
+                                moved = true;
+                                scoreGained += target.value;
+                                mergedThisWave.push({ x: lastValid.x, y: lastValid.y, value: target.value });
+                            } else {
+                                // 移动
+                                this.grid[r][c] = null;
+                                this.grid[lastValid.y][lastValid.x] = tile;
+                                tile.x = lastValid.x;
+                                tile.y = lastValid.y;
+                                moved = true;
+                            }
+                        }
+                    });
+                });
+
+                return { moved, mergedThisWave, scoreGained };
+            }
+
+            async move(vec) {
+                this.saveState();
+                this.isAnimating = true;
+
+                let waveCount = 0;
+                while (true) {
+                    let res = this.singleStep(vec);
+                    if (!res.moved) break;
+
+                    waveCount++;
+                    this.score += res.scoreGained;
+                    this.updateView();
+                    this.updateScore();
+
+                    // 先移除再强制重排，保证每一波的动画都能重新播放
+                    this.boardContainer.classList.remove('shake-mild', 'zoom-punch');
+                    void this.boardContainer.offsetWidth;
+                    if (waveCount >= 2) {
+                        this.boardContainer.classList.add('shake-mild');
+                    } else if (res.mergedThisWave.length > 0) {
+                        this.boardContainer.classList.add('zoom-punch');
+                    }
+
+                    if (res.mergedThisWave.length > 0) {
+                        let center = res.mergedThisWave[0];
+                        this.showFloat(center.x, center.y, `+${res.scoreGained}`);
+                        if (waveCount >= 2) {
+                            this.showBadge(center.x, center.y, `⚡ 连锁 x${waveCount}!`);
+                        }
+                    }
+
+                    // 慢动作停顿
+                    await new Promise(r => setTimeout(r, 260));
+                }
+                this.boardContainer.classList.remove('shake-mild', 'zoom-punch');
+
+                if (waveCount > 0) {
+                    this.addRandomTile();
+                    this.updateView();
+                } else {
+                    // 无效移动不占用悔棋记录
+                    this.history.pop();
+                }
+
+                this.updateScore();
+                this.isAnimating = false;
+
+                if (this.isGameOver()) {
+                    this.messageText.textContent = "游戏结束！";
+                    this.messageEl.classList.add('active');
+                }
+            }
+
+            updateScore() {
+                if (this.score > this.bestScore) {
+                    this.bestScore = this.score;
+                    writeBest(this.bestScore);
+                }
+                this.scoreEl.textContent = this.score;
+                this.bestScoreEl.textContent = this.bestScore;
+            }
+
+            // 计算格子中心在页面上的坐标（考虑滚动和棋盘内边距）
+            cellPagePos(gx, gy, fy) {
+                const rect = this.boardContainer.getBoundingClientRect();
+                const inner = rect.width - GAP * 2;
+                const cw = (inner - GAP * 3) / 4;
+                return {
+                    x: rect.left + window.scrollX + GAP + gx * (cw + GAP) + cw / 2,
+                    y: rect.top + window.scrollY + GAP + gy * (cw + GAP) + cw * fy
+                };
+            }
+
+            showFloat(gx, gy, text) {
+                const p = this.cellPagePos(gx, gy, 0.3);
+                const el = document.createElement('div');
+                el.className = 'score-float';
+                el.style.left = `${p.x - 20}px`;
+                el.style.top = `${p.y}px`;
+                el.textContent = text;
+                document.body.appendChild(el);
+                setTimeout(() => el.remove(), 700);
+            }
+
+            showBadge(gx, gy, text) {
+                const p = this.cellPagePos(gx, gy, 0.1);
+                const el = document.createElement('div');
+                el.className = 'chain-badge';
+                el.style.left = `${p.x - 40}px`;
+                el.style.top = `${p.y - 15}px`;
+                el.textContent = text;
+                document.body.appendChild(el);
+                setTimeout(() => el.remove(), 800);
+            }
+
+            updateView() {
+                this.tileContainer.innerHTML = '';
+                this.tiles.forEach(tile => {
+                    const el = document.createElement('div');
+                    let cls = tile.value <= 2048 ? `tile-${tile.value}` : 'tile-2048';
+                    let anim = tile.isNew ? 'tile-new' : (tile.merged ? 'tile-merged' : '');
+                    tile.isNew = false;
+
+                    el.className = `tile ${cls} ${anim}`;
+                    el.textContent = tile.value;
+                    // 每格位移 = 方块宽度 + 间距
+                    el.style.transform = `translate(calc(${tile.x * 100}% + ${tile.x * GAP}px), calc(${tile.y * 100}% + ${tile.y * GAP}px))`;
+                    this.tileContainer.appendChild(el);
+                });
+            }
+
+            isGameOver() {
+                for (let r = 0; r < this.size; r++) {
+                    for (let c = 0; c < this.size; c++) {
+                        if (!this.grid[r][c]) return false;
+                        let v = this.grid[r][c].value;
+                        if (c + 1 < this.size && this.grid[r][c + 1]?.value === v) return false;
+                        if (r + 1 < this.size && this.grid[r + 1][c]?.value === v) return false;
+                    }
+                }
+                return true;
+            }
+        }
+
+        window.onload = () => { window.game = new Game2048(); };
+    </script>
+</body>
+</html>
